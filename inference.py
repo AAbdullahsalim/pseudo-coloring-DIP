@@ -96,8 +96,15 @@ class PseudoColorizer:
         # Predict
         pred = self.model.predict(img_batch, verbose=0)[0]
         
+        # Debug: Check prediction range
+        print(f"Prediction range: [{pred.min():.3f}, {pred.max():.3f}]")
+        print(f"Prediction mean: {pred.mean():.3f}")
+        
+        # Ensure values are in [0, 1] range (sigmoid should already do this)
+        pred = np.clip(pred, 0, 1)
+        
         # Convert to uint8
-        pred_img = (np.clip(pred, 0, 1) * 255).astype("uint8")
+        pred_img = (pred * 255).astype("uint8")
         
         # Generate output path if not provided
         if output_path is None:
