@@ -23,10 +23,10 @@ OUTPUT_CHANNELS = 3  # RGB output
 UNET_FILTERS = [32, 64, 128, 256]  # Encoder/decoder filter sizes
 
 # ==================== Training Configuration ====================
-EPOCHS = 20
+EPOCHS = 30  # Increased for better learning
 STEPS_PER_EPOCH = 50
 LEARNING_RATE = 1e-4
-LOSS_WEIGHT_PCC = 0.3  # Weight for PCC loss component
+LOSS_WEIGHT_PCC = 0.2  # Reduced to focus more on color accuracy
 
 # Data augmentation
 AUGMENTATION = {

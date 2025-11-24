@@ -79,17 +79,23 @@ class PseudoColorizer:
         
         return img_batch
     
-    def colorize(self, img_path, output_path=None):
+    def colorize(self, img_path, output_path=None, enhance_colors=True, preserve_structure=True):
         """
         Colorize a single grayscale image.
         
         Args:
             img_path: Path to input grayscale image
             output_path: Path to save output. If None, auto-generates name
+            enhance_colors: If True, enhances color saturation to make output more vibrant
+            preserve_structure: If True, preserves grayscale structure better
         
         Returns:
             Colorized image array [H, W, 3] in RGB format
         """
+        # Read original grayscale image for structure preservation
+        original_gray = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        original_gray_resized = cv2.resize(original_gray, config.IMAGE_SIZE)
+        
         # Preprocess
         img_batch = self.preprocess_image(img_path)
         
@@ -102,6 +108,36 @@ class PseudoColorizer:
         
         # Ensure values are in [0, 1] range (sigmoid should already do this)
         pred = np.clip(pred, 0, 1)
+        
+        # Enhance colors if requested
+        if enhance_colors:
+            # Increase saturation by stretching the color range
+            # This makes the colors more vibrant
+            pred_min, pred_max = pred.min(), pred.max()
+            if pred_max > pred_min:
+                pred = (pred - pred_min) / (pred_max - pred_min + 1e-8)
+                # Slight boost to make colors pop
+                pred = np.power(pred, 0.9)  # Gamma correction to brighten
+        
+        # Preserve grayscale structure
+        if preserve_structure:
+            # Convert predicted RGB to grayscale to get predicted luminance
+            pred_gray = cv2.cvtColor((pred * 255).astype("uint8"), cv2.COLOR_RGB2GRAY) / 255.0
+            
+            # Normalize original grayscale to [0, 1]
+            original_norm = original_gray_resized.astype("float32") / 255.0
+            
+            # Calculate luminance ratio to preserve original structure
+            # This ensures the output has the same brightness distribution as input
+            luminance_ratio = original_norm / (pred_gray + 1e-8)
+            luminance_ratio = np.clip(luminance_ratio, 0.5, 2.0)  # Limit ratio to avoid artifacts
+            
+            # Apply luminance correction to each color channel
+            pred_corrected = pred.copy()
+            for c in range(3):
+                pred_corrected[:, :, c] = pred[:, :, c] * luminance_ratio
+            
+            pred = np.clip(pred_corrected, 0, 1)
         
         # Convert to uint8
         pred_img = (pred * 255).astype("uint8")
