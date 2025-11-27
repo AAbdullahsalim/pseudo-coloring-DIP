@@ -109,35 +109,30 @@ class PseudoColorizer:
         # Ensure values are in [0, 1] range (sigmoid should already do this)
         pred = np.clip(pred, 0, 1)
         
-        # Enhance colors if requested
-        if enhance_colors:
-            # Increase saturation by stretching the color range
-            # This makes the colors more vibrant
-            pred_min, pred_max = pred.min(), pred.max()
-            if pred_max > pred_min:
-                pred = (pred - pred_min) / (pred_max - pred_min + 1e-8)
-                # Slight boost to make colors pop
-                pred = np.power(pred, 0.9)  # Gamma correction to brighten
+        # Simple and effective approach: Use LAB color space
+        # Replace only luminance, keep predicted colors
+        original_norm = original_gray_resized.astype("float32") / 255.0
         
-        # Preserve grayscale structure
-        if preserve_structure:
-            # Convert predicted RGB to grayscale to get predicted luminance
-            pred_gray = cv2.cvtColor((pred * 255).astype("uint8"), cv2.COLOR_RGB2GRAY) / 255.0
-            
-            # Normalize original grayscale to [0, 1]
-            original_norm = original_gray_resized.astype("float32") / 255.0
-            
-            # Calculate luminance ratio to preserve original structure
-            # This ensures the output has the same brightness distribution as input
-            luminance_ratio = original_norm / (pred_gray + 1e-8)
-            luminance_ratio = np.clip(luminance_ratio, 0.5, 2.0)  # Limit ratio to avoid artifacts
-            
-            # Apply luminance correction to each color channel
-            pred_corrected = pred.copy()
-            for c in range(3):
-                pred_corrected[:, :, c] = pred[:, :, c] * luminance_ratio
-            
-            pred = np.clip(pred_corrected, 0, 1)
+        # Convert predicted RGB to LAB
+        pred_rgb_uint8 = (np.clip(pred, 0, 1) * 255).astype("uint8")
+        pred_lab = cv2.cvtColor(pred_rgb_uint8, cv2.COLOR_RGB2LAB)
+        
+        # Replace L channel with original grayscale (preserves structure)
+        # Scale original to 0-255 range for L channel
+        original_l = (original_norm * 255).astype("uint8")
+        pred_lab[:, :, 0] = original_l
+        
+        # Convert back to RGB (now has original brightness + predicted colors)
+        pred_rgb_corrected = cv2.cvtColor(pred_lab, cv2.COLOR_LAB2RGB)
+        pred = pred_rgb_corrected.astype("float32") / 255.0
+        
+        # Light saturation boost if requested
+        if enhance_colors:
+            pred_hsv = cv2.cvtColor(pred_rgb_corrected, cv2.COLOR_RGB2HSV).astype("float32")
+            # Moderate saturation boost (25%)
+            pred_hsv[:, :, 1] = np.clip(pred_hsv[:, :, 1] * 1.25, 0, 255)
+            pred_hsv_uint8 = pred_hsv.astype("uint8")
+            pred = cv2.cvtColor(pred_hsv_uint8, cv2.COLOR_HSV2RGB).astype("float32") / 255.0
         
         # Convert to uint8
         pred_img = (pred * 255).astype("uint8")
@@ -289,14 +284,28 @@ if __name__ == "__main__":
     # If run without arguments, use default behavior
     import sys
     if len(sys.argv) == 1:
-        # Default: process the example image
-        default_image = "data/gray/class1/grey image.jpeg"
-        if os.path.exists(default_image):
+        # Try to find any grayscale image in the default directory
+        gray_dir = config.GRAY_DIR
+        default_image = None
+        
+        # First try the original default
+        test_path = os.path.join(gray_dir, "class1", "grey image.jpeg")
+        if os.path.exists(test_path):
+            default_image = test_path
+        else:
+            # Find any image in the gray directory
+            image_files = find_images(gray_dir)
+            if image_files:
+                default_image = image_files[0]  # Use first found image
+        
+        if default_image and os.path.exists(default_image):
             print("No arguments provided. Using default image...")
             sys.argv = ["inference.py", default_image]
         else:
             print("Usage: python inference.py <image_path> [-o output_path]")
             print("       python inference.py <directory> --batch")
+            print("\nExample:")
+            print("  python inference.py data/gray/class1/gray image 2.jpeg")
             sys.exit(1)
     
     exit(main())

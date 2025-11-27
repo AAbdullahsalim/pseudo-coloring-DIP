@@ -9,7 +9,8 @@ import config
 
 def conv_block(x, filters, kernel_size=3):
     """
-    Convolutional block with two conv layers.
+    Convolutional block with two conv layers + batch normalization.
+    Enhanced to better learn local features.
     
     Args:
         x: Input tensor
@@ -19,8 +20,14 @@ def conv_block(x, filters, kernel_size=3):
     Returns:
         Output tensor after two convolutions
     """
-    x = layers.Conv2D(filters, kernel_size, padding="same", activation="relu")(x)
-    x = layers.Conv2D(filters, kernel_size, padding="same", activation="relu")(x)
+    x = layers.Conv2D(filters, kernel_size, padding="same", use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+    
+    x = layers.Conv2D(filters, kernel_size, padding="same", use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+    
     return x
 
 

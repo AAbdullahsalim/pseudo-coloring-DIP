@@ -23,10 +23,10 @@ OUTPUT_CHANNELS = 3  # RGB output
 UNET_FILTERS = [32, 64, 128, 256]  # Encoder/decoder filter sizes
 
 # ==================== Training Configuration ====================
-EPOCHS = 30  # Increased for better learning
+EPOCHS = 60  # Increased for better local feature learning
 STEPS_PER_EPOCH = 50
-LEARNING_RATE = 1e-4
-LOSS_WEIGHT_PCC = 0.2  # Reduced to focus more on color accuracy
+LEARNING_RATE = 5e-5  # Lower for more stable learning of local features
+LOSS_WEIGHT_PCC = 0.15  # Balanced for color learning
 
 # Data augmentation
 AUGMENTATION = {
